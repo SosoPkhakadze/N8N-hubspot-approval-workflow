@@ -302,8 +302,8 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 
 **Soso Pkhakadze**
 
-- GitHub: [@your-github-username](https://sosopkhakadze.github.io/my-portfolio/)
-- LinkedIn: [your-linkedin](https://www.linkedin.com/in/soso-pkhakadze-733428274/)
+- GitHub: [@sosopkhakadze](https://sosopkhakadze.github.io/my-portfolio/)
+- LinkedIn: [soso-pkhakadze-linkedin](https://www.linkedin.com/in/soso-pkhakadze-733428274/)
 
 ---
 
