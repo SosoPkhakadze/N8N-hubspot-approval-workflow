@@ -1,0 +1,1145 @@
+{
+  "name": "Automation Engineer Task (n8n)",
+  "nodes": [
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "list"
+        },
+        "text": "={{ $('Valid or Invalid').item.json.message }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        3060,
+        320
+      ],
+      "name": "Invalid Data",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "list"
+        },
+        "message": "={{ $json.message }}",
+        "responseType": "customForm",
+        "defineForm": "json",
+        "jsonOutput": "[\n  {\n    \"fieldLabel\": \"Approve or Reject\",\n    \"requiredField\": true,\n    \"fieldType\": \"dropdown\",\n    \"fieldOptions\": {\n      \"values\": [\n        { \"option\": \"Approve\" },\n        { \"option\": \"Reject\" }\n      ]\n    }\n  }\n]\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1760,
+        40
+      ],
+      "name": "Ask Approval",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        340
+      ],
+      "name": "New Row Added",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Full validation code for \"Prepare Messages\" node\n\nlet Error_Message = \"\";\nlet fullDataText = \"\";\n\n// Standard email validation function\nfunction isValidEmail(email) {\n  const emailRegex = /^(([^<>()\\[\\]\\\\.,;:\\s@\"]+(\\.[^<>()\\[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$/;\n  return emailRegex.test(String(email).toLowerCase());\n}\n\n// Get the triggered item (new row added)\nconst triggeredItem = $('Loop Over Items').first().json;\n\n// Get all existing rows from the \"Get All Rows\" node (full sheet)\nconst allRows = $('Get All Rows').all().map(r => r.json);\n\n// Extract the Transaction_ID from the triggered row\nconst newTransactionID = triggeredItem.Transaction_ID;\nconst newRowNumber = triggeredItem.row_number;\n\n// Build a readable summary of the triggered data\nfullDataText = `Submitted Data:\\n` +\n               `Name: ${triggeredItem.Name || \"(empty)\"}\\n` +\n               `Email: ${triggeredItem.Email || \"(empty)\"}\\n` +\n               `Transaction_ID: ${newTransactionID || \"(empty)\"}\\n`;\n\n// --- Validation Checks ---\n\n// 1. Check for missing/invalid Name\nif (!triggeredItem.Name) {\n  Error_Message += \"Name is invalid (cannot be empty)\\n\";\n}\n\n// 2. Check for missing or invalid Email\nif (!triggeredItem.Email) {\n  Error_Message += \"Email is invalid (cannot be empty)\\n\";\n} else if (!isValidEmail(triggeredItem.Email)) {\n  Error_Message += `Email format is invalid for \"${triggeredItem.Email}\"\\n`;\n}\n\n// 3. Check for missing/invalid Transaction_ID\nif (!newTransactionID && newTransactionID !== 0) {\n  Error_Message += \"Transaction_ID is invalid (cannot be empty)\\n\";\n} else {\n  // 4. Check for duplicate Transaction_ID using row_number\n  // Find all rows with the same Transaction_ID\n  const sameTxnRows = allRows\n    .filter(row => row.Transaction_ID === newTransactionID)\n    .sort((a, b) => a.row_number - b.row_number); // sort ascending by row_number\n\n  // If the triggered row is not the first occurrence, it's a duplicate\n  if (sameTxnRows.length > 1 && sameTxnRows[0].row_number !== newRowNumber) {\n    Error_Message += `Transaction_ID \"${newTransactionID}\" already exists in a previous row (duplicate entry)\\n`;\n  }\n}\n\n// Construct the message to send\nlet message = \"\";\n\nif (Error_Message) {\n  message = `❌ Validation Failed:\\n${Error_Message.trim()}\\n\\n${fullDataText}`;\n  return [{ json: { valid: false, message: message } }];\n} else {\n  message = `✅ Validation Passed. Please review and approve:\\n\\n${fullDataText}`;\n  return [{ json: { valid: true, message: message } }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        200
+      ],
+      "name": "Prepare Messages"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        140
+      ],
+      "name": "Valid or Invalid"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data[\"Approve or Reject\"] }}",
+              "rightValue": "Reject",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        40
+      ],
+      "name": "Approved or Rejected"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "=Rejected",
+            "row_number": "={{ $('Loop Over Items').item.json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transaction_ID",
+              "displayName": "Transaction_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        2860,
+        -160
+      ],
+      "name": "Rejected",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"email\": \"{{ $('Loop Over Items').first().json.Email }}\",\n    \"full_name\": \"{{ $('Loop Over Items').first().json.Name }}\",\n    \"transaction_id\": \"{{ $('Loop Over Items').first().json.Transaction_ID }}\",\n    \"n8n_workflow\": \"n8n\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        40
+      ],
+      "name": "Add to Hubspot",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+          
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Transaction_ID": "={{ $('Loop Over Items').first().json.Transaction_ID }}",
+            "Email": "={{ $('Loop Over Items').first().json.Email }}",
+            "Name": "={{ $('Loop Over Items').first().json.Name }}",
+            "Status": "={{ $('Approved or Rejected').item.json.data[\"Approve or Reject\"] }}",
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "row_number": "={{ $('Loop Over Items').item.json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transaction_ID",
+              "displayName": "Transaction_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        3080,
+        40
+      ],
+      "name": "Log the status",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "sendTo": "example@gmail.com",
+        "subject": "=HubSpot Workflow Result: {{ $json.statusCode == 200 ? 'Success' : 'Failure' }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3520,
+        315
+      ],
+      "name": "Summary",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"email\": \"{{ $('Loop Over Items').first().json.Email }}\",\n    \"full_name\": \"{{ $('Loop Over Items').first().json.Name }}\",\n    \"transaction_id\": \"{{ $('Loop Over Items').first().json.Transaction_ID }}\",\n    \"n8n_workflow\": \"n8n\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        240
+      ],
+      "name": "Update to Hubspot",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "=Approved",
+            "row_number": "={{ $('Loop Over Items').item.json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transaction_ID",
+              "displayName": "Transaction_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        2200,
+        140
+      ],
+      "name": "Approved",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "// This code robustly handles inputs from different branches by first\n// inspecting the structure of its immediate incoming data ($input).\n\nconst inputData = $input.item.json;\nlet subject = '';\nlet message = '';\n\n// --- PATH 1: VALIDATION FAILED ---\n// We check for properties that are unique to the output of a Slack node,\n// which is the input for this Code node only when validation fails.\nif (inputData.ok === true && inputData.channel) {\n  subject = 'n8n Workflow Result — Validation Failed';\n\n  // The actual error message isn't in the Slack node's output.\n  // We must go back and retrieve it from the 'Prepare Messages' node, which always runs.\n  const validationData = $('Prepare Messages').item.json;\n  const errorMessage = validationData.message\n    .replace(/❌ Validation Failed：\\n/, '')\n    .replace(/\\n\\n/g, '<br><br>')\n    .replace(/\\n/g, '<br>');\n\n  message = `\n  ⚠️ <b>Workflow Summary — Data Validation Failed</b><br><br>\n  ${errorMessage}\n  <br>\n  <i>No data was sent to HubSpot. Please correct the issues in the source and resubmit.</i>\n  `;\n\n// --- PATH 2: VALIDATION PASSED ---\n// If the input doesn't look like it came from the Slack node, it must have\n// come from the 'Log the status' node, meaning it was approved or rejected.\n} else {\n  // In this path, the input IS the log data.\n  const logData = inputData;\n  const status = logData.Status ? logData.Status.toLowerCase() : 'unknown';\n\n  // -- Sub-Case: Rejected --\n  if (status.includes('reject')) { // Using .includes() is flexible for \"Reject\" or \"Rejected\"\n    subject = 'n8n Workflow Result — Rejected';\n    message = `\n    🚫 <b>Workflow Summary — Submission Rejected</b><br><br>\n    <b>The following entry was reviewed and rejected by the approver.</b><br><br>\n    <b>Submission Details:</b><br>\n    • Name: ${logData.Name || 'N/A'}<br>\n    • Email: ${logData.Email || 'N/A'}<br>\n    • Transaction ID: ${logData.Transaction_ID || 'N/A'}<br>\n    • Approval Status: ${logData.Status}<br>\n    • Timestamp: ${logData.Timestamp ? new Date(logData.Timestamp).toLocaleString() : 'N/A'}<br><br>\n    <i>The data has been logged as rejected. No HubSpot record was created or updated.</i>\n    `;\n  \n  // -- Sub-Case: Approved --\n  } else if (status.includes('approve')) { // Flexible for \"Approve\" or \"Approved\"\n    subject = 'n8n Workflow Result — Approved';\n    \n    // Safely get data from HubSpot nodes.\n    let addResult = null;\n    let updateResult = null;\n\n    try {\n      addResult = $('Add to Hubspot').first()?.json;\n    } catch (e) {\n      // Node was not executed, ignore error.\n    }\n\n    try {\n      updateResult = $('Update to Hubspot').first()?.json;\n    } catch (e) {\n      // Node was not executed, ignore error.\n    }\n    \n    const hubspot = addResult || updateResult;\n    \n    message = `\n    ✅ <b>Workflow Summary — Approved & Synced to HubSpot</b><br><br>\n    <b>Contact was successfully approved and added or updated in HubSpot.</b><br><br>\n    <b>Contact Details:</b><br>\n    • Name: ${logData.Name}<br>\n    • Email: ${logData.Email}<br>\n    • Transaction ID: ${logData.Transaction_ID}<br>\n    • Approval Status: ${logData.Status}<br>\n    • Timestamp: ${logData.Timestamp ? new Date(logData.Timestamp).toLocaleString() : 'N/A'}<br><br>`;\n    \n    if (hubspot && hubspot.id) {\n      message += `\n      <b>HubSpot Record:</b><br>\n      • Action: ${addResult ? 'Created' : 'Updated'}<br>\n      • HubSpot ID: ${hubspot.id}<br>\n      • Created At: ${new Date(hubspot.createdAt).toLocaleString()}<br>\n      • Last Modified: ${new Date(hubspot.updatedAt).toLocaleString()}<br><br>\n      💡 This contact has been successfully logged and synced in HubSpot.\n      `;\n    } else {\n      message += `\n      <b>HubSpot Record:</b><br>\n      <i>Error: Could not retrieve HubSpot data from the workflow. Please check the execution log.</i><br><br>\n      `;\n    }\n    \n  // -- Sub-Case: Fallback for any other status --\n  } else {\n    subject = 'n8n Workflow Result — Unknown Status';\n    message = `\n    ℹ️ <b>Workflow Summary — Unknown Result</b><br><br>\n    The workflow completed, but its final status could not be determined. Please review the execution log.<br><br>\n    <b>Logged Data:</b><br>\n    <pre>${JSON.stringify(logData, null, 2)}</pre>\n    `;\n  }\n}\n\n// Return the final subject and body to be used by the email node.\nreturn [{\n  json: {\n    subject: subject,\n    body: message\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        240
+      ],
+      "name": "Summary text"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        140
+      ],
+      "name": "If Contact Exists"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        {\n          \"propertyName\": \"email\",\n          \"operator\": \"EQ\",\n          \"value\": \"{{ $('Loop Over Items').first().json.Email }}\"\n        }\n      ]\n    }\n  ],\n  \"properties\": [\"email\", \"full_name\", \"transaction_id\"]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        140
+      ],
+      "name": "Search for Contact",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "row_number",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        880,
+        220
+      ],
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        200
+      ],
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -220,
+        340
+      ],
+      "name": "Get All Rows",
+      "executeOnce": true,
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all rows from Google Sheet node\nconst allRows = $input.all();\n\n// Get the last row\nconst lastRow = allRows[allRows.length - 1].json;\n\n// Helper: check if Transaction_ID is missing\nfunction isMissingTransactionID(row) {\n  const tid = row.Transaction_ID?.toString().trim();\n  return !tid || tid === \"\";\n}\n\n// --- MAIN LOGIC ---\nlet waitNeeded = false;\nlet newStatus = lastRow.Status?.toString().trim() || \"\";\nlet reason = \"\";\n\n// CASE 1: Transaction_ID missing and status empty → mark as waiting\nif (isMissingTransactionID(lastRow) && newStatus === \"\") {\n  waitNeeded = true;\n  newStatus = \"Waiting for Transaction ID\";\n  reason = \"Waiting for Transaction ID - continue waiting\";\n}\n\n// CASE 2: Transaction_ID missing and status is already \"Waiting for Transaction ID\" → mark invalid\nelse if (isMissingTransactionID(lastRow) && newStatus === \"Waiting for Transaction ID\") {\n  waitNeeded = false;\n  newStatus = \"Invalid - No Transaction ID\";\n  reason = \"Transaction ID missing - marking invalid\";\n}\n\n// CASE 3: Transaction_ID added and status was \"Waiting for Transaction ID\" → clear status\nelse if (!isMissingTransactionID(lastRow) && newStatus === \"Waiting for Transaction ID\") {\n  waitNeeded = false;\n  newStatus = \"\"; // reset status\n  reason = \"Transaction ID added - status cleared\";\n}\n\n// CASE 4: Transaction_ID exists and status is normal → proceed normally\nelse {\n  waitNeeded = false;\n  reason = \"Transaction_ID present - proceeding\";\n}\n\n// Return last row and new status\nreturn [\n  {\n    json: {\n      waitNeeded: waitNeeded,\n      lastRow: lastRow,\n      newStatus: newStatus,\n      reason: reason\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        265
+      ],
+      "name": "Pre-Loop Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Pre-Loop Check').item.json.waitNeeded }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        260
+      ],
+      "name": "Is Wait Not Needed?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "=Invalid",
+            "row_number": "={{ $('Loop Over Items').item.json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transaction_ID",
+              "displayName": "Transaction_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        2660,
+        360
+      ],
+      "name": "Invalid_2",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.lastRow.row_number }}",
+            "Status": "={{ $json.newStatus }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transaction_ID",
+              "displayName": "Transaction_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        220,
+        265
+      ],
+      "name": "Invalid_1",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "amount": "=10"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        420
+      ],
+      "name": "Wait 10 Seconds"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all rows from Google Sheet node\nconst allRows = $('Get All Rows').all();\n\n// Helper: check if row is incomplete\nfunction isIncomplete(row) {\n  const tid = row.Transaction_ID?.toString().trim();\n  const status = row.Status?.toString().trim();\n\n  // Include rows where:\n  // 1) Transaction_ID is missing\n  // 2) Status is empty\n  // 3) Status is \"Waiting for Transaction ID\"\n  return !tid || tid === \"\" || !status || status === \"\" || status === \"Waiting for Transaction ID\";\n}\n\n// Filter rows that are incomplete\nconst incompleteRows = allRows\n  .map(r => r.json)   // get the full JSON of each row\n  .filter(isIncomplete);\n\n// Return all incomplete rows in proper n8n format\nreturn incompleteRows.map(row => {\n  return {\n    json: row\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        215
+      ],
+      "name": "New Data"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Row Added": {
+      "main": [
+        [
+          {
+            "node": "Get All Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Messages": {
+      "main": [
+        [
+          {
+            "node": "Valid or Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid or Invalid": {
+      "main": [
+        [
+          {
+            "node": "Ask Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid_2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Approval": {
+      "main": [
+        [
+          {
+            "node": "Approved or Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved or Rejected": {
+      "main": [
+        [
+          {
+            "node": "Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Hubspot": {
+      "main": [
+        [
+          {
+            "node": "Log the status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log the status": {
+      "main": [
+        [
+          {
+            "node": "Summary text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invalid Data": {
+      "main": [
+        [
+          {
+            "node": "Summary text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rejected": {
+      "main": [
+        [
+          {
+            "node": "Log the status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update to Hubspot": {
+      "main": [
+        [
+          {
+            "node": "Log the status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved": {
+      "main": [
+        [
+          {
+            "node": "Search for Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary text": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Contact Exists": {
+      "main": [
+        [
+          {
+            "node": "Add to Hubspot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update to Hubspot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search for Contact": {
+      "main": [
+        [
+          {
+            "node": "If Contact Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Prepare Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Rows": {
+      "main": [
+        [
+          {
+            "node": "Pre-Loop Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Loop Check": {
+      "main": [
+        [
+          {
+            "node": "Invalid_1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Wait Not Needed?": {
+      "main": [
+        [
+          {
+            "node": "New Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invalid_2": {
+      "main": [
+        [
+          {
+            "node": "Invalid Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invalid_1": {
+      "main": [
+        [
+          {
+            "node": "Is Wait Not Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Get All Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Data": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": ""
+  },
+  "tags": []
+}
