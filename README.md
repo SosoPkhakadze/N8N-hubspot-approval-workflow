@@ -1,4 +1,3 @@
-# N8N-hubspot-approval-workflow
 # n8n Data Validation & HubSpot Sync Workflow
 
 > Automated workflow for validating Google Sheets data, routing approvals via Slack, and syncing approved contacts to HubSpot CRM with comprehensive audit logging.
